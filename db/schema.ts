@@ -21,10 +21,12 @@ export const profiles = pgTable("profiles", {
 export const resumes = pgTable("resumes", {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull().references(() => profiles.id),
+    label: text("label").default("My Resume").notNull(), // user-facing name, e.g. "ML-focused v2"
     fileUrl: text("file_url").notNull(),
     rawText: text("raw_text"),
     analysis: jsonb("analysis"), // score, suggestions — Claude's JSON
-    isPrimary: boolean("is_primary").default(true).notNull(),
+    // exactly one primary per user — enforced in actions (set new -> unset old)
+    isPrimary: boolean("is_primary").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -42,14 +44,26 @@ export const projects = pgTable("projects", {
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const jobMatches = pgTable("job_matches", {
+export const jobs = pgTable("jobs", {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull().references(() => profiles.id),
-    jobTitle: text("job_title"),
+    title: text("title").notNull(),
     company: text("company"),
-    jobDescription: text("job_description").notNull(),
-    matchScore: integer("match_score"),
-    analysis: jsonb("analysis"), // covered, gaps, hidden strengths
+    rawDescription: text("raw_description").notNull(),
+    extracted: jsonb("extracted").notNull(), // Zod-validated JD extraction
+    // embedding of the extracted requirements summary; null in v1 —
+    // populated once an embedding provider lands with the advisor feature
+    embedding: vector("embedding", { dimensions: 1536 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const matches = pgTable("matches", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id").notNull().references(() => jobs.id),
+    resumeId: uuid("resume_id").notNull().references(() => resumes.id),
+    userId: uuid("user_id").notNull().references(() => profiles.id),
+    score: integer("score").notNull(), // 0-100 overall match
+    analysis: jsonb("analysis").notNull(), // Zod-validated match analysis
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

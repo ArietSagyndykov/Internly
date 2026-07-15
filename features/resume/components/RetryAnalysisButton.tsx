@@ -3,14 +3,14 @@
 import { useState, useTransition } from "react";
 import { retryAnalysis } from "../actions";
 
-export function RetryAnalysisButton() {
+export function RetryAnalysisButton({ resumeId }: { resumeId: string }) {
     const [error, setError] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
 
     function handleClick() {
         setError(null);
         startTransition(async () => {
-            const result = await retryAnalysis();
+            const result = await retryAnalysis(resumeId);
             if ("error" in result) setError(result.error);
         });
     }

@@ -1,12 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
+import { parseWithSchema } from "@/lib/claude";
 import {
     RESUME_ANALYSIS_SYSTEM_PROMPT,
     buildResumeAnalysisUserMessage,
 } from "./prompts";
-
-const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY automatically
 
 export const ResumeAnalysisSchema = z.object({
     overallScore: z.number().min(0).max(100),
@@ -34,25 +31,10 @@ export async function analyzeResume(
     resumeText: string,
     targetRole?: string
 ): Promise<ResumeAnalysis> {
-    const response = await anthropic.messages.parse({
-        model: "claude-sonnet-4-6",
-        max_tokens: 3000,
+    return parseWithSchema({
         system: RESUME_ANALYSIS_SYSTEM_PROMPT,
-        messages: [
-            {
-                role: "user",
-                content: buildResumeAnalysisUserMessage(resumeText, targetRole),
-            },
-        ],
-        output_config: {
-            format: zodOutputFormat(ResumeAnalysisSchema),
-        },
+        userMessage: buildResumeAnalysisUserMessage(resumeText, targetRole),
+        schema: ResumeAnalysisSchema,
+        maxTokens: 3000,
     });
-
-    if (!response.parsed_output) {
-        throw new Error(
-            `Analysis produced no parsable output (stop_reason: ${response.stop_reason})`
-        );
-    }
-    return response.parsed_output;
 }
