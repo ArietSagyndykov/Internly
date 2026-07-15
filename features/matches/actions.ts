@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
@@ -83,7 +83,9 @@ export async function analyzeJob(
             languages: projects.languages,
         })
         .from(projects)
-        .where(eq(projects.userId, user.id));
+        .where(
+            and(eq(projects.userId, user.id), eq(projects.isVisible, true))
+        );
 
     const projectSummaries: ProjectSummary[] = projectRows.map((p) => ({
         name: p.name,
