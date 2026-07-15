@@ -1,13 +1,13 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { extractText } from "unpdf";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { resumes } from "@/db/schema";
 import { analyzeResume, type ResumeAnalysis } from "./analyze";
-import { getLatestResume } from "./queries";
+import { getResumeById, listResumes } from "./queries";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -28,6 +28,12 @@ export async function uploadResume(
     if (file.size > MAX_FILE_SIZE) {
         return { error: "File is too large — the limit is 5MB." };
     }
+
+    const labelInput = formData.get("label");
+    const label =
+        typeof labelInput === "string" && labelInput.trim().length > 0
+            ? labelInput.trim()
+            : file.name.replace(/\.pdf$/i, "") || "My Resume";
 
     // 1. Upload the original PDF to private storage
     const path = `${user.id}/${Date.now()}.pdf`;
@@ -62,27 +68,30 @@ export async function uploadResume(
         // still save the resume — user can retry analysis later
     }
 
-    // 4. Save the row
+    // 4. Save the row — first resume in the library becomes primary
+    const existing = await listResumes(user.id);
     await db.insert(resumes).values({
         userId: user.id,
+        label,
         fileUrl: path,
         rawText: text,
         analysis,
+        isPrimary: existing.length === 0,
     });
 
     revalidatePath("/resume");
     return { success: true };
 }
 
-export async function retryAnalysis(): Promise<
-    { error: string } | { success: true }
-> {
+export async function retryAnalysis(
+    resumeId: string
+): Promise<{ error: string } | { success: true }> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "You must be signed in to retry analysis." };
 
-    const resume = await getLatestResume(user.id);
-    if (!resume) return { error: "No resume uploaded yet." };
+    const resume = await getResumeById(user.id, resumeId);
+    if (!resume) return { error: "Resume not found." };
     if (!resume.rawText || resume.rawText.trim().length < 100) {
         return { error: "This resume has no extracted text to analyze." };
     }
@@ -100,6 +109,31 @@ export async function retryAnalysis(): Promise<
         .update(resumes)
         .set({ analysis })
         .where(eq(resumes.id, resume.id));
+
+    revalidatePath("/resume");
+    return { success: true };
+}
+
+export async function setPrimaryResume(
+    resumeId: string
+): Promise<{ error: string } | { success: true }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "You must be signed in." };
+
+    const resume = await getResumeById(user.id, resumeId);
+    if (!resume) return { error: "Resume not found." };
+
+    await db.transaction(async (tx) => {
+        await tx
+            .update(resumes)
+            .set({ isPrimary: false })
+            .where(and(eq(resumes.userId, user.id), eq(resumes.isPrimary, true)));
+        await tx
+            .update(resumes)
+            .set({ isPrimary: true })
+            .where(eq(resumes.id, resume.id));
+    });
 
     revalidatePath("/resume");
     return { success: true };

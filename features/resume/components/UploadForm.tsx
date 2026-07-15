@@ -18,8 +18,15 @@ export function UploadForm() {
     return (
         <form action={handleSubmit} className="mt-6 rounded-xl border p-6">
             <label htmlFor="resume-file" className="block text-sm font-medium">
-                Upload your resume (PDF, max 5MB)
+                Upload a resume (PDF, max 5MB)
             </label>
+            <input
+                id="resume-label"
+                type="text"
+                name="label"
+                placeholder="Label, e.g. ML-focused v2 (optional — defaults to filename)"
+                className="mt-3 w-full rounded-lg border px-3 py-2 text-sm"
+            />
             <div className="mt-3 flex items-center gap-3">
                 <input
                     id="resume-file"

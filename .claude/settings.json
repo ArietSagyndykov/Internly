@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(node /private/tmp/claude-501/-Users-arietsagyndykov-Desktop-internly/c213f6f4-6ccf-4fdc-8f43-0badf0c33872/scratchpad/check-analysis.mjs)"
+    ]
+  }
+}
